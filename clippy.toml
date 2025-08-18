@@ -1,0 +1,28 @@
+# TYL Framework Standard Clippy Configuration
+
+# Documentation
+missing-docs-in-crate-items = true
+
+# Performance and efficiency
+too-many-arguments-threshold = 8
+type-complexity-threshold = 250
+trivial-copy-size-limit = 256
+
+# Code quality
+cognitive-complexity-threshold = 30
+
+# Avoid false positives for common patterns
+avoid-breaking-exported-api = true
+
+# Allow certain patterns common in async/database code
+allow-expect-in-tests = true
+allow-unwrap-in-tests = true
+
+# String handling
+max-suggested-slice-pattern-length = 3
+
+# Naming conventions - follow Rust standards
+enum-variant-name-threshold = 3
+
+# Module organization
+max-trait-bounds = 3

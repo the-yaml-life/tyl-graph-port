@@ -1,0 +1,48 @@
+# Rust/Cargo
+/target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+*.exe
+*.dll
+*.so
+*.dylib
+.cargo/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test outputs
+/test-results/
+
+# Coverage reports
+/coverage/
+*.profraw
+lcov.info
+*.gcov
+*.gcda
+*.gcno
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Temporary files
+*.tmp
+*.temp

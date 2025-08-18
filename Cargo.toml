@@ -1,0 +1,37 @@
+[package]
+name = "tyl-graph-port"
+version = "0.1.0"
+edition = "2021"
+authors = ["TYL Framework Team"]
+license = "AGPL-3.0"
+repository = "https://github.com/the-yaml-life/tyl-graph-port"
+description = "Graph database port for TYL framework - defines traits for graph stores"
+homepage = "https://github.com/the-yaml-life/tyl-graph-port"
+documentation = "https://docs.rs/tyl-graph-port"
+readme = "README.md"
+keywords = ["graph", "database", "traversal", "cypher", "tyl"]
+categories = ["database", "database-implementations"]
+
+[dependencies]
+# TYL Framework Dependencies
+tyl-errors = { git = "https://github.com/the-yaml-life/tyl-errors.git", branch = "main" }
+tyl-db-core = { git = "https://github.com/the-yaml-life/tyl-db-core.git", branch = "main" }
+
+# Core Dependencies
+async-trait = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# Mock implementation dependencies
+tokio = { version = "1.0", features = ["sync"], optional = true }
+
+[dev-dependencies]
+tokio = { version = "1.0", features = ["full"] }
+tokio-test = "0.4"
+
+[features]
+default = []
+mock = ["tokio"]
