@@ -29,8 +29,11 @@ async fn main() -> TylResult<()> {
         // Create a test graph
         let mut metadata = HashMap::new();
         metadata.insert("name".to_string(), serde_json::json!("Test Graph"));
-        metadata.insert("description".to_string(), serde_json::json!("A test graph for demonstrations"));
-        
+        metadata.insert(
+            "description".to_string(),
+            serde_json::json!("A test graph for demonstrations"),
+        );
+
         let graph_info = GraphInfo {
             id: TEST_GRAPH_ID.to_string(),
             metadata,
@@ -361,7 +364,12 @@ async fn graph_analytics_examples(store: &MockGraphStore) -> TylResult<()> {
         // Get relationship recommendations
         if let Some(alice) = people.first() {
             let recommendations = store
-                .recommend_relationships(TEST_GRAPH_ID, &alice.id, RecommendationType::CommonNeighbors, 3)
+                .recommend_relationships(
+                    TEST_GRAPH_ID,
+                    &alice.id,
+                    RecommendationType::CommonNeighbors,
+                    3,
+                )
                 .await?;
 
             println!(
@@ -485,7 +493,9 @@ async fn health_monitoring_examples(store: &MockGraphStore) -> TylResult<()> {
 
         if let Some(labels) = graph_stats.get("labels") {
             println!("   - Node Labels:");
-            if let Ok(label_counts) = serde_json::from_value::<HashMap<String, usize>>(labels.clone()) {
+            if let Ok(label_counts) =
+                serde_json::from_value::<HashMap<String, usize>>(labels.clone())
+            {
                 for (label, count) in label_counts {
                     println!("     * {label}: {count} nodes");
                 }
@@ -494,7 +504,8 @@ async fn health_monitoring_examples(store: &MockGraphStore) -> TylResult<()> {
 
         if let Some(rel_types) = graph_stats.get("relationship_types") {
             println!("   - Relationship Types:");
-            if let Ok(type_counts) = serde_json::from_value::<HashMap<String, usize>>(rel_types.clone())
+            if let Ok(type_counts) =
+                serde_json::from_value::<HashMap<String, usize>>(rel_types.clone())
             {
                 for (rel_type, count) in type_counts {
                     println!("     * {rel_type}: {count} relationships");

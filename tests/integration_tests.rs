@@ -388,7 +388,7 @@ async fn test_health_monitoring_integration() -> TylResult<()> {
     let stats = store.get_all_statistics().await.unwrap();
     // Stats is HashMap<graph_id, HashMap<stat_name, value>>
     assert!(!stats.is_empty());
-    
+
     // Get statistics for TEST_GRAPH_ID
     let graph_stats = stats.get(TEST_GRAPH_ID).unwrap();
     assert_eq!(graph_stats.get("node_count"), Some(&serde_json::json!(1)));
@@ -428,7 +428,9 @@ async fn test_error_handling_integration() -> TylResult<()> {
     // Test updating non-existent relationship
     let mut updates = HashMap::new();
     updates.insert("key".to_string(), serde_json::json!("value"));
-    let result = store.update_relationship(TEST_GRAPH_ID, "non_existent", updates).await;
+    let result = store
+        .update_relationship(TEST_GRAPH_ID, "non_existent", updates)
+        .await;
     assert!(result.is_err());
 
     // Test traversal from non-existent node
@@ -439,7 +441,12 @@ async fn test_error_handling_integration() -> TylResult<()> {
 
     // Test path finding with non-existent nodes
     let result = store
-        .find_shortest_path(TEST_GRAPH_ID, "non_existent_1", "non_existent_2", TraversalParams::default())
+        .find_shortest_path(
+            TEST_GRAPH_ID,
+            "non_existent_1",
+            "non_existent_2",
+            TraversalParams::default(),
+        )
         .await;
     assert!(result.is_ok());
     assert!(result.unwrap().is_none());
@@ -473,7 +480,10 @@ async fn test_performance_and_scalability() -> TylResult<()> {
         .collect();
 
     let start = std::time::Instant::now();
-    let results = store.create_nodes_batch(TEST_GRAPH_ID, nodes).await.unwrap();
+    let results = store
+        .create_nodes_batch(TEST_GRAPH_ID, nodes)
+        .await
+        .unwrap();
     let creation_time = start.elapsed();
 
     // Should complete reasonably quickly
@@ -609,7 +619,9 @@ async fn test_concurrent_access() -> TylResult<()> {
         let handle = tokio::spawn(async move {
             let mut updates = HashMap::new();
             updates.insert("counter".to_string(), serde_json::json!(i));
-            store_clone.update_node(TEST_GRAPH_ID, "shared_node", updates).await
+            store_clone
+                .update_node(TEST_GRAPH_ID, "shared_node", updates)
+                .await
         });
         handles.push(handle);
     }
