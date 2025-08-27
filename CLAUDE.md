@@ -8,10 +8,15 @@
 
 This module provides:
 
+- **Multi-Graph Management**: Support for multiple isolated graphs
 - **Graph Storage Interfaces**: CRUD operations for nodes and relationships
-- **Graph Traversal Interfaces**: Path finding, neighbor discovery, graph exploration
+- **Graph Traversal Interfaces**: Path finding, neighbor discovery, graph exploration  
 - **Graph Analytics Interfaces**: Centrality calculations, community detection, pattern recognition
-- **Query Execution Interfaces**: Custom query support for database-specific operations
+- **Transaction Management**: ACID transactions with configurable isolation levels
+- **Index Management**: Node property, fulltext, vector, and composite indexes
+- **Constraint Management**: Data integrity with unique, exists, type, and range constraints
+- **Bulk Operations**: Batch processing and data import/export
+- **Query Execution Interfaces**: Database-agnostic query support
 - **Health Monitoring Interfaces**: Connection health and statistics
 - **Mock Implementation**: Complete in-memory implementation for testing
 
@@ -28,18 +33,23 @@ This module provides:
 │  └───────────────┘  └──────────────┘  └─────────────────┘  │
 │            │                 │                 │            │
 │  ┌───────────────┐  ┌──────────────┐  ┌─────────────────┐  │
-│  │ MockGraphStore│  │ Neo4jAdapter │  │ FalkorDBAdapter │  │
-│  │ (Adapter)     │  │ (Adapter)    │  │ (Adapter)       │  │
+│  │ MockGraphStore│  │ GraphAdapter │  │ GraphAdapter    │  │
+│  │ (Mock)        │  │ (Database A) │  │ (Database B)    │  │
 │  └───────────────┘  └──────────────┘  └─────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### **Core Traits**
 
+- **MultiGraphManager**: Multi-graph management operations
 - **GraphStore**: Primary storage operations (CRUD for nodes/relationships)
 - **GraphTraversal**: Graph exploration and path finding
 - **GraphAnalytics**: Advanced graph analysis and intelligence
-- **GraphQueryExecutor**: Custom query execution
+- **GraphTransaction**: ACID transaction management
+- **GraphIndexManager**: Index creation and management
+- **GraphConstraintManager**: Data integrity constraints
+- **GraphBulkOperations**: Batch processing operations
+- **GraphQueryExecutor**: Database-agnostic query execution
 - **GraphHealth**: Health monitoring and statistics
 
 ## 📊 **Data Model**

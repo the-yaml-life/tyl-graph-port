@@ -372,9 +372,8 @@ async fn query_execution_examples(store: &MockGraphStore) -> TylResult<()> {
     println!("--------------------------");
 
     // Example read query
-    let read_query =
-        GraphQuery::read("MATCH (p:Person) RETURN p.name, p.department ORDER BY p.name")
-            .with_parameter("limit", serde_json::json!(10));
+    let read_query = GraphQuery::read("SELECT name, department FROM persons ORDER BY name")
+        .with_parameter("limit", serde_json::json!(10));
 
     let read_result = store.execute_read_query(read_query).await?;
     println!("📊 Read query executed successfully");
@@ -388,10 +387,11 @@ async fn query_execution_examples(store: &MockGraphStore) -> TylResult<()> {
     }
 
     // Example write query
-    let write_query =
-        GraphQuery::write("CREATE (temp:TempNode {created_by: $creator, timestamp: $time})")
-            .with_parameter("creator", serde_json::json!("basic_usage_example"))
-            .with_parameter("time", serde_json::json!(chrono::Utc::now().to_rfc3339()));
+    let write_query = GraphQuery::write(
+        "INSERT INTO temp_nodes (created_by, timestamp) VALUES ($creator, $time)",
+    )
+    .with_parameter("creator", serde_json::json!("basic_usage_example"))
+    .with_parameter("time", serde_json::json!(chrono::Utc::now().to_rfc3339()));
 
     let write_result = store.execute_write_query(write_query).await?;
     println!("✏️  Write query executed successfully");
@@ -399,7 +399,7 @@ async fn query_execution_examples(store: &MockGraphStore) -> TylResult<()> {
     println!("   - Metadata entries: {write_metadata_count}");
 
     // Demonstrate query validation
-    let invalid_write_as_read = GraphQuery::write("CREATE (n:TestNode)");
+    let invalid_write_as_read = GraphQuery::write("INSERT INTO test_nodes DEFAULT VALUES");
     match store.execute_read_query(invalid_write_as_read).await {
         Ok(_) => println!("❌ Unexpected success"),
         Err(_) => {

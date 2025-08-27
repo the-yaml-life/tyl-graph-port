@@ -9,7 +9,7 @@ description = "Graph database port for TYL framework - defines traits for graph 
 homepage = "https://github.com/the-yaml-life/tyl-graph-port"
 documentation = "https://docs.rs/tyl-graph-port"
 readme = "README.md"
-keywords = ["graph", "database", "traversal", "cypher", "tyl"]
+keywords = ["graph", "database", "traversal", "port", "tyl"]
 categories = ["database", "database-implementations"]
 
 [dependencies]

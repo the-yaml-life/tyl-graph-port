@@ -19,8 +19,19 @@ use tyl_graph_port::MockGraphStore;
 #[cfg(feature = "mock")]
 #[tokio::test]
 async fn test_complete_graph_storage_workflow() {
-    // TDD: Complete workflow from creation to deletion
+    // TDD: Complete workflow from creation to deletion with multi-graph support
     let store = MockGraphStore::new();
+    let graph_id = "test-graph";
+
+    // First create the graph
+    let graph_info = GraphInfo {
+        id: graph_id.to_string(),
+        name: "Test Graph".to_string(),
+        metadata: HashMap::new(),
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    store.create_graph(graph_info).await.unwrap();
 
     // Test batch node creation
     let nodes = vec![
@@ -38,7 +49,7 @@ async fn test_complete_graph_storage_workflow() {
             .with_property("industry", serde_json::json!("Technology")),
     ];
 
-    let results = store.create_nodes_batch(nodes).await.unwrap();
+    let results = store.create_nodes_batch(graph_id, nodes).await.unwrap();
     assert_eq!(results.len(), 3);
 
     let node_ids: Vec<String> = results.into_iter().map(|r| r.unwrap()).collect();
@@ -54,48 +65,59 @@ async fn test_complete_graph_storage_workflow() {
     ];
 
     for rel in relationships {
-        let _rel_id = store.create_relationship(rel).await.unwrap();
+        let _rel_id = store.create_relationship(graph_id, rel).await.unwrap();
     }
 
     // Verify the graph structure
-    assert_eq!(store.node_count().await, 3);
-    assert_eq!(store.relationship_count().await, 3);
+    assert_eq!(store.node_count(graph_id).await, 3);
+    assert_eq!(store.relationship_count(graph_id).await, 3);
 
     // Test finding nodes by criteria
     let people = store
-        .find_nodes(vec!["Person".to_string()], HashMap::new())
+        .find_nodes(graph_id, vec!["Person".to_string()], HashMap::new())
         .await
         .unwrap();
     assert_eq!(people.len(), 2);
 
     let companies = store
-        .find_nodes(vec!["Company".to_string()], HashMap::new())
+        .find_nodes(graph_id, vec!["Company".to_string()], HashMap::new())
         .await
         .unwrap();
     assert_eq!(companies.len(), 1);
 
     // Test finding relationships by type
     let work_relationships = store
-        .find_relationships(vec!["WORKS_FOR".to_string()], HashMap::new())
+        .find_relationships(graph_id, vec!["WORKS_FOR".to_string()], HashMap::new())
         .await
         .unwrap();
     assert_eq!(work_relationships.len(), 2);
 
     // Cleanup
     for node_id in node_ids {
-        store.delete_node(&node_id).await.unwrap();
+        store.delete_node(graph_id, &node_id).await.unwrap();
     }
 
-    assert_eq!(store.node_count().await, 0);
-    assert_eq!(store.relationship_count().await, 0);
+    assert_eq!(store.node_count(graph_id).await, 0);
+    assert_eq!(store.relationship_count(graph_id).await, 0);
 }
 
 /// Test complex graph traversal scenarios
 #[cfg(feature = "mock")]
 #[tokio::test]
 async fn test_complex_graph_traversal() {
-    // TDD: Complex graph traversal with filters and constraints
+    // TDD: Complex graph traversal with filters and constraints with multi-graph support
     let store = MockGraphStore::new();
+    let graph_id = "traversal-graph";
+
+    // First create the graph
+    let graph_info = GraphInfo {
+        id: graph_id.to_string(),
+        name: "Traversal Test Graph".to_string(),
+        metadata: HashMap::new(),
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    store.create_graph(graph_info).await.unwrap();
 
     // Create a more complex graph structure
     // A -> B -> C
@@ -124,7 +146,7 @@ async fn test_complex_graph_traversal() {
     ];
 
     for node in nodes {
-        store.create_node(node).await.unwrap();
+        store.create_node(graph_id, node).await.unwrap();
     }
 
     let relationships = vec![
@@ -138,7 +160,7 @@ async fn test_complex_graph_traversal() {
     ];
 
     for rel in relationships {
-        store.create_relationship(rel).await.unwrap();
+        store.create_relationship(graph_id, rel).await.unwrap();
     }
 
     // Test filtered traversal - only horizontal relationships
@@ -147,7 +169,7 @@ async fn test_complex_graph_traversal() {
         .with_max_depth(3);
 
     let horizontal_neighbors = store
-        .get_neighbors("A", horizontal_params.clone())
+        .get_neighbors(graph_id, "A", horizontal_params.clone())
         .await
         .unwrap();
     assert_eq!(horizontal_neighbors.len(), 1);
@@ -155,7 +177,7 @@ async fn test_complex_graph_traversal() {
 
     // Test path finding with filters
     let path_horizontal = store
-        .find_shortest_path("A", "C", horizontal_params)
+        .find_shortest_path(graph_id, "A", "C", horizontal_params)
         .await
         .unwrap();
     assert!(path_horizontal.is_some());
@@ -171,7 +193,7 @@ async fn test_complex_graph_traversal() {
         .with_max_depth(2);
 
     let reachable_from_e = store
-        .traverse_from("E", bidirectional_params)
+        .traverse_from(graph_id, "E", bidirectional_params)
         .await
         .unwrap();
     assert!(reachable_from_e.len() >= 4); // E can reach multiple nodes
@@ -181,7 +203,10 @@ async fn test_complex_graph_traversal() {
         .with_node_label("Level1")
         .with_max_depth(3);
 
-    let level1_traversal = store.traverse_from("A", level1_params).await.unwrap();
+    let level1_traversal = store
+        .traverse_from(graph_id, "A", level1_params)
+        .await
+        .unwrap();
     let level1_count = level1_traversal
         .iter()
         .filter(|node| node.labels.contains(&"Level1".to_string()))
@@ -193,15 +218,26 @@ async fn test_complex_graph_traversal() {
 #[cfg(feature = "mock")]
 #[tokio::test]
 async fn test_graph_analytics_integration() {
-    // TDD: Graph analytics with real graph data
+    // TDD: Graph analytics with real graph data with multi-graph support
     let store = MockGraphStore::new();
+    let graph_id = "analytics-graph";
+
+    // First create the graph
+    let graph_info = GraphInfo {
+        id: graph_id.to_string(),
+        name: "Analytics Test Graph".to_string(),
+        metadata: HashMap::new(),
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    store.create_graph(graph_info).await.unwrap();
 
     // Create a star graph: central node connected to multiple others
     let center_node = GraphNode::with_id("center")
         .with_label("Hub")
         .with_property("type", serde_json::json!("central"));
 
-    store.create_node(center_node).await.unwrap();
+    store.create_node(graph_id, center_node).await.unwrap();
 
     let spoke_nodes = (1..=5)
         .map(|i| {
@@ -212,18 +248,18 @@ async fn test_graph_analytics_integration() {
         .collect::<Vec<_>>();
 
     for node in spoke_nodes {
-        store.create_node(node).await.unwrap();
+        store.create_node(graph_id, node).await.unwrap();
     }
 
     // Connect all spokes to center
     for i in 1..=5 {
         let rel = GraphRelationship::new("center", format!("spoke_{i}"), "CONNECTS_TO");
-        store.create_relationship(rel).await.unwrap();
+        store.create_relationship(graph_id, rel).await.unwrap();
     }
 
     // Test centrality calculation
     let centrality = store
-        .calculate_centrality(vec!["center".to_string()], CentralityType::Degree)
+        .calculate_centrality(graph_id, vec!["center".to_string()], CentralityType::Degree)
         .await
         .unwrap();
 
@@ -232,7 +268,7 @@ async fn test_graph_analytics_integration() {
 
     // Test community detection
     let communities = store
-        .detect_communities(ClusteringAlgorithm::Louvain, HashMap::new())
+        .detect_communities(graph_id, ClusteringAlgorithm::Louvain, HashMap::new())
         .await
         .unwrap();
 
@@ -241,7 +277,7 @@ async fn test_graph_analytics_integration() {
 
     // Test relationship recommendations
     let recommendations = store
-        .recommend_relationships("spoke_1", RecommendationType::CommonNeighbors, 3)
+        .recommend_relationships(graph_id, "spoke_1", RecommendationType::CommonNeighbors, 3)
         .await
         .unwrap();
 
@@ -254,30 +290,47 @@ async fn test_graph_analytics_integration() {
 #[cfg(feature = "mock")]
 #[tokio::test]
 async fn test_query_execution_integration() {
-    // TDD: Query execution with proper validation
+    // TDD: Query execution with proper validation with multi-graph support
     let store = MockGraphStore::new();
+    let graph_id = "query-graph";
+
+    // First create the graph
+    let graph_info = GraphInfo {
+        id: graph_id.to_string(),
+        name: "Query Test Graph".to_string(),
+        metadata: HashMap::new(),
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    store.create_graph(graph_info).await.unwrap();
 
     // Test read query execution
-    let read_query = GraphQuery::read("MATCH (n) RETURN n LIMIT 10")
+    let read_query = GraphQuery::read("SELECT * FROM nodes LIMIT 10")
         .with_parameter("limit", serde_json::json!(10));
 
-    let read_result = store.execute_read_query(read_query).await.unwrap();
+    let read_result = store
+        .execute_read_query(graph_id, read_query)
+        .await
+        .unwrap();
     assert!(read_result.metadata.contains_key("executed_at"));
 
     // Test write query execution
-    let write_query = GraphQuery::write("CREATE (n:TestNode {name: $name})")
+    let write_query = GraphQuery::write("INSERT INTO test_nodes (name) VALUES ($name)")
         .with_parameter("name", serde_json::json!("test"));
 
-    let write_result = store.execute_write_query(write_query).await.unwrap();
+    let write_result = store
+        .execute_write_query(graph_id, write_query)
+        .await
+        .unwrap();
     assert!(write_result.metadata.contains_key("executed_at"));
 
     // Test query validation - should fail when using wrong method
-    let write_query_wrong = GraphQuery::write("CREATE (n:TestNode)");
-    let result = store.execute_read_query(write_query_wrong).await;
+    let write_query_wrong = GraphQuery::write("INSERT INTO test_nodes DEFAULT VALUES");
+    let result = store.execute_read_query(graph_id, write_query_wrong).await;
     assert!(result.is_err());
 
-    let read_query_wrong = GraphQuery::read("MATCH (n) RETURN n");
-    let result = store.execute_write_query(read_query_wrong).await;
+    let read_query_wrong = GraphQuery::read("SELECT * FROM nodes");
+    let result = store.execute_write_query(graph_id, read_query_wrong).await;
     assert!(result.is_err());
 }
 

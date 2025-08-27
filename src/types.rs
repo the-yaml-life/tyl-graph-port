@@ -403,6 +403,8 @@ pub enum CentralityType {
     Eigenvector,
     /// PageRank centrality
     PageRank,
+    /// Katz centrality
+    Katz,
 }
 
 /// Clustering algorithms
@@ -429,6 +431,488 @@ pub enum RecommendationType {
     StructuralEquivalence,
     /// Path-based similarity
     PathSimilarity,
+}
+
+// ===== NEW FEATURES - Multi-Graph and Advanced Capabilities =====
+
+/// Graph information and metadata
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct GraphInfo {
+    /// Graph identifier
+    pub id: String,
+    /// Graph name/description
+    pub name: String,
+    /// Graph metadata
+    pub metadata: HashMap<String, serde_json::Value>,
+    /// When this graph was created
+    pub created_at: DateTime<Utc>,
+    /// When this graph was last updated
+    pub updated_at: DateTime<Utc>,
+}
+
+impl GraphInfo {
+    /// Create a new graph info
+    pub fn new(id: impl Into<String>, name: impl Into<String>) -> Self {
+        let now = Utc::now();
+        Self {
+            id: id.into(),
+            name: name.into(),
+            metadata: HashMap::new(),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    /// Add metadata to the graph
+    pub fn with_metadata(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+        self.metadata.insert(key.into(), value);
+        self
+    }
+}
+
+/// Transaction context for ACID operations
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TransactionContext {
+    /// Transaction ID
+    pub id: String,
+    /// Is read-only transaction
+    pub read_only: bool,
+    /// Transaction isolation level
+    pub isolation_level: IsolationLevel,
+    /// Transaction timeout in seconds
+    pub timeout_seconds: Option<u64>,
+    /// Transaction metadata
+    pub metadata: HashMap<String, serde_json::Value>,
+}
+
+impl TransactionContext {
+    /// Create a new read-write transaction
+    pub fn new() -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            read_only: false,
+            isolation_level: IsolationLevel::ReadCommitted,
+            timeout_seconds: None,
+            metadata: HashMap::new(),
+        }
+    }
+
+    /// Create a read-only transaction
+    pub fn read_only() -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            read_only: true,
+            isolation_level: IsolationLevel::ReadCommitted,
+            timeout_seconds: None,
+            metadata: HashMap::new(),
+        }
+    }
+
+    /// Set transaction isolation level
+    pub fn with_isolation(mut self, level: IsolationLevel) -> Self {
+        self.isolation_level = level;
+        self
+    }
+
+    /// Set transaction timeout
+    pub fn with_timeout(mut self, seconds: u64) -> Self {
+        self.timeout_seconds = Some(seconds);
+        self
+    }
+}
+
+impl Default for TransactionContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Transaction isolation levels
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum IsolationLevel {
+    /// Read uncommitted (lowest isolation)
+    ReadUncommitted,
+    /// Read committed (default for most databases)
+    ReadCommitted,
+    /// Repeatable read
+    RepeatableRead,
+    /// Serializable (highest isolation)
+    Serializable,
+}
+
+/// Index configuration for performance optimization
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct IndexConfig {
+    /// Index name
+    pub name: String,
+    /// Index type
+    pub index_type: IndexType,
+    /// Properties to index
+    pub properties: Vec<String>,
+    /// Labels to index (for nodes) or relationship types (for relationships)
+    pub labels_or_types: Vec<String>,
+    /// Index options
+    pub options: HashMap<String, serde_json::Value>,
+}
+
+impl IndexConfig {
+    /// Create a new node property index
+    pub fn node_property(
+        name: impl Into<String>,
+        labels: Vec<String>,
+        properties: Vec<String>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            index_type: IndexType::NodeProperty,
+            properties,
+            labels_or_types: labels,
+            options: HashMap::new(),
+        }
+    }
+
+    /// Create a new relationship property index
+    pub fn relationship_property(
+        name: impl Into<String>,
+        relationship_types: Vec<String>,
+        properties: Vec<String>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            index_type: IndexType::RelationshipProperty,
+            properties,
+            labels_or_types: relationship_types,
+            options: HashMap::new(),
+        }
+    }
+
+    /// Create a full-text index
+    pub fn fulltext(name: impl Into<String>, labels: Vec<String>, properties: Vec<String>) -> Self {
+        Self {
+            name: name.into(),
+            index_type: IndexType::Fulltext,
+            properties,
+            labels_or_types: labels,
+            options: HashMap::new(),
+        }
+    }
+
+    /// Add option to the index
+    pub fn with_option(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+        self.options.insert(key.into(), value);
+        self
+    }
+}
+
+/// Types of indexes
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum IndexType {
+    /// Standard property index for nodes
+    NodeProperty,
+    /// Standard property index for relationships
+    RelationshipProperty,
+    /// Full-text search index
+    Fulltext,
+    /// Vector similarity index
+    Vector,
+    /// Composite index (multiple properties)
+    Composite,
+}
+
+/// Constraint configuration for data integrity
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ConstraintConfig {
+    /// Constraint name
+    pub name: String,
+    /// Constraint type
+    pub constraint_type: ConstraintType,
+    /// Properties involved in constraint
+    pub properties: Vec<String>,
+    /// Labels (for nodes) or relationship types (for relationships)
+    pub labels_or_types: Vec<String>,
+    /// Constraint options
+    pub options: HashMap<String, serde_json::Value>,
+}
+
+impl ConstraintConfig {
+    /// Create a uniqueness constraint
+    pub fn unique(name: impl Into<String>, labels: Vec<String>, properties: Vec<String>) -> Self {
+        Self {
+            name: name.into(),
+            constraint_type: ConstraintType::Unique,
+            properties,
+            labels_or_types: labels,
+            options: HashMap::new(),
+        }
+    }
+
+    /// Create an existence constraint
+    pub fn exists(name: impl Into<String>, labels: Vec<String>, properties: Vec<String>) -> Self {
+        Self {
+            name: name.into(),
+            constraint_type: ConstraintType::Exists,
+            properties,
+            labels_or_types: labels,
+            options: HashMap::new(),
+        }
+    }
+
+    /// Add option to the constraint
+    pub fn with_option(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+        self.options.insert(key.into(), value);
+        self
+    }
+}
+
+/// Types of constraints
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ConstraintType {
+    /// Uniqueness constraint
+    Unique,
+    /// Property existence constraint
+    Exists,
+    /// Type constraint (property must be of specific type)
+    Type,
+    /// Range constraint (property must be within range)
+    Range,
+}
+
+/// Aggregation function configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AggregationQuery {
+    /// Function to apply
+    pub function: AggregationFunction,
+    /// Property to aggregate
+    pub property: Option<String>,
+    /// Group by properties
+    pub group_by: Vec<String>,
+    /// Filters to apply
+    pub filters: HashMap<String, serde_json::Value>,
+}
+
+impl AggregationQuery {
+    /// Create a COUNT aggregation
+    pub fn count() -> Self {
+        Self {
+            function: AggregationFunction::Count,
+            property: None,
+            group_by: Vec::new(),
+            filters: HashMap::new(),
+        }
+    }
+
+    /// Create a SUM aggregation
+    pub fn sum(property: impl Into<String>) -> Self {
+        Self {
+            function: AggregationFunction::Sum,
+            property: Some(property.into()),
+            group_by: Vec::new(),
+            filters: HashMap::new(),
+        }
+    }
+
+    /// Create an AVG aggregation
+    pub fn avg(property: impl Into<String>) -> Self {
+        Self {
+            function: AggregationFunction::Avg,
+            property: Some(property.into()),
+            group_by: Vec::new(),
+            filters: HashMap::new(),
+        }
+    }
+
+    /// Add grouping
+    pub fn group_by(mut self, property: impl Into<String>) -> Self {
+        self.group_by.push(property.into());
+        self
+    }
+
+    /// Add filter
+    pub fn with_filter(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+        self.filters.insert(key.into(), value);
+        self
+    }
+}
+
+/// Types of aggregation functions
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum AggregationFunction {
+    /// Count elements
+    Count,
+    /// Sum numeric values
+    Sum,
+    /// Average numeric values
+    Avg,
+    /// Minimum value
+    Min,
+    /// Maximum value
+    Max,
+    /// Collect values into array
+    Collect,
+    /// Standard deviation
+    StdDev,
+}
+
+/// Result of aggregation query
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AggregationResult {
+    /// Aggregated value
+    pub value: serde_json::Value,
+    /// Group by values (if any)
+    pub groups: HashMap<String, serde_json::Value>,
+    /// Result metadata
+    pub metadata: HashMap<String, serde_json::Value>,
+}
+
+/// Weighted path for advanced pathfinding
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WeightedPath {
+    /// Path nodes and relationships
+    pub path: GraphPath,
+    /// Total path weight
+    pub total_weight: f64,
+    /// Individual edge weights
+    pub edge_weights: Vec<f64>,
+    /// Weight calculation method used
+    pub weight_method: WeightMethod,
+}
+
+impl WeightedPath {
+    /// Create a weighted path
+    pub fn new(path: GraphPath, edge_weights: Vec<f64>, method: WeightMethod) -> Self {
+        let total_weight = match method {
+            WeightMethod::Sum => edge_weights.iter().sum(),
+            WeightMethod::Average => edge_weights.iter().sum::<f64>() / edge_weights.len() as f64,
+            WeightMethod::Max => edge_weights.iter().cloned().fold(0.0, f64::max),
+            WeightMethod::Min => edge_weights.iter().cloned().fold(f64::INFINITY, f64::min),
+        };
+
+        Self { path, total_weight, edge_weights, weight_method: method }
+    }
+}
+
+/// Weight calculation methods
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum WeightMethod {
+    /// Sum all edge weights
+    Sum,
+    /// Average edge weights
+    Average,
+    /// Maximum edge weight
+    Max,
+    /// Minimum edge weight
+    Min,
+}
+
+/// Temporal query parameters for time-based operations
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TemporalQuery {
+    /// Start time for query
+    pub start_time: Option<DateTime<Utc>>,
+    /// End time for query
+    pub end_time: Option<DateTime<Utc>>,
+    /// Temporal property to query on
+    pub temporal_property: String,
+    /// Temporal operation
+    pub operation: TemporalOperation,
+}
+
+impl TemporalQuery {
+    /// Create a query for data at specific time
+    pub fn at(time: DateTime<Utc>, property: impl Into<String>) -> Self {
+        Self {
+            start_time: Some(time),
+            end_time: Some(time),
+            temporal_property: property.into(),
+            operation: TemporalOperation::At,
+        }
+    }
+
+    /// Create a query for data between times
+    pub fn between(start: DateTime<Utc>, end: DateTime<Utc>, property: impl Into<String>) -> Self {
+        Self {
+            start_time: Some(start),
+            end_time: Some(end),
+            temporal_property: property.into(),
+            operation: TemporalOperation::Between,
+        }
+    }
+
+    /// Create a query for data before time
+    pub fn before(time: DateTime<Utc>, property: impl Into<String>) -> Self {
+        Self {
+            start_time: None,
+            end_time: Some(time),
+            temporal_property: property.into(),
+            operation: TemporalOperation::Before,
+        }
+    }
+
+    /// Create a query for data after time
+    pub fn after(time: DateTime<Utc>, property: impl Into<String>) -> Self {
+        Self {
+            start_time: Some(time),
+            end_time: None,
+            temporal_property: property.into(),
+            operation: TemporalOperation::After,
+        }
+    }
+}
+
+/// Temporal query operations
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum TemporalOperation {
+    /// At specific time
+    At,
+    /// Between two times
+    Between,
+    /// Before specific time
+    Before,
+    /// After specific time
+    After,
+}
+
+/// Bulk operation configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct BulkOperation<T> {
+    /// Items to process
+    pub items: Vec<T>,
+    /// Batch size for processing
+    pub batch_size: usize,
+    /// Continue on error
+    pub continue_on_error: bool,
+    /// Operation metadata
+    pub metadata: HashMap<String, serde_json::Value>,
+}
+
+impl<T> BulkOperation<T> {
+    /// Create a new bulk operation
+    pub fn new(items: Vec<T>) -> Self {
+        Self {
+            items,
+            batch_size: 1000,
+            continue_on_error: false,
+            metadata: HashMap::new(),
+        }
+    }
+
+    /// Set batch size
+    pub fn with_batch_size(mut self, size: usize) -> Self {
+        self.batch_size = size;
+        self
+    }
+
+    /// Set error handling
+    pub fn continue_on_error(mut self) -> Self {
+        self.continue_on_error = true;
+        self
+    }
+
+    /// Add metadata
+    pub fn with_metadata(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+        self.metadata.insert(key.into(), value);
+        self
+    }
 }
 
 #[cfg(test)]
@@ -509,15 +993,15 @@ mod tests {
     #[test]
     fn test_graph_query_builder_pattern_should_work() {
         // TDD: GraphQuery builder should work correctly
-        let query = GraphQuery::read("MATCH (n) RETURN n")
+        let query = GraphQuery::read("SELECT * FROM nodes")
             .with_parameter("limit", serde_json::json!(10))
             .with_parameter("offset", serde_json::json!(0));
 
-        assert_eq!(query.query, "MATCH (n) RETURN n");
+        assert_eq!(query.query, "SELECT * FROM nodes");
         assert!(!query.is_write_query);
         assert_eq!(query.parameters.len(), 2);
 
-        let write_query = GraphQuery::write("CREATE (n:Person {name: $name})");
+        let write_query = GraphQuery::write("INSERT INTO persons (name) VALUES ($name)");
         assert!(write_query.is_write_query);
     }
 
@@ -549,5 +1033,201 @@ mod tests {
         let serialized = serde_json::to_string(&centrality).unwrap();
         let deserialized: CentralityType = serde_json::from_str(&serialized).unwrap();
         assert_eq!(centrality, deserialized);
+    }
+
+    // ===== TESTS FOR NEW FEATURES =====
+
+    #[test]
+    fn test_graph_info_creation_should_work() {
+        // TDD: GraphInfo should be creatable with metadata
+        let graph_info = GraphInfo::new("social_graph", "Social Network Graph")
+            .with_metadata("version", serde_json::json!("1.0"))
+            .with_metadata("tenant", serde_json::json!("user_123"));
+
+        assert_eq!(graph_info.id, "social_graph");
+        assert_eq!(graph_info.name, "Social Network Graph");
+        assert_eq!(graph_info.metadata.get("version"), Some(&serde_json::json!("1.0")));
+        assert_eq!(graph_info.metadata.get("tenant"), Some(&serde_json::json!("user_123")));
+    }
+
+    #[test]
+    fn test_transaction_context_creation_should_work() {
+        // TDD: TransactionContext should support different configurations
+        let tx_default = TransactionContext::new();
+        assert!(!tx_default.read_only);
+        assert_eq!(tx_default.isolation_level, IsolationLevel::ReadCommitted);
+
+        let tx_readonly = TransactionContext::read_only()
+            .with_isolation(IsolationLevel::Serializable)
+            .with_timeout(30);
+
+        assert!(tx_readonly.read_only);
+        assert_eq!(tx_readonly.isolation_level, IsolationLevel::Serializable);
+        assert_eq!(tx_readonly.timeout_seconds, Some(30));
+    }
+
+    #[test]
+    fn test_index_config_creation_should_work() {
+        // TDD: IndexConfig should support different index types
+        let node_index = IndexConfig::node_property(
+            "person_name_idx",
+            vec!["Person".to_string()],
+            vec!["name".to_string()],
+        )
+        .with_option("case_sensitive", serde_json::json!(false));
+
+        assert_eq!(node_index.name, "person_name_idx");
+        assert_eq!(node_index.index_type, IndexType::NodeProperty);
+        assert_eq!(node_index.labels_or_types, vec!["Person"]);
+        assert_eq!(node_index.properties, vec!["name"]);
+
+        let fulltext_index = IndexConfig::fulltext(
+            "content_search",
+            vec!["Document".to_string()],
+            vec!["title".to_string(), "content".to_string()],
+        );
+
+        assert_eq!(fulltext_index.index_type, IndexType::Fulltext);
+        assert_eq!(fulltext_index.properties.len(), 2);
+    }
+
+    #[test]
+    fn test_constraint_config_creation_should_work() {
+        // TDD: ConstraintConfig should support different constraint types
+        let unique_constraint = ConstraintConfig::unique(
+            "person_email_unique",
+            vec!["Person".to_string()],
+            vec!["email".to_string()],
+        );
+
+        assert_eq!(unique_constraint.constraint_type, ConstraintType::Unique);
+        assert_eq!(unique_constraint.properties, vec!["email"]);
+
+        let exists_constraint = ConstraintConfig::exists(
+            "person_name_required",
+            vec!["Person".to_string()],
+            vec!["name".to_string()],
+        )
+        .with_option("allow_empty", serde_json::json!(false));
+
+        assert_eq!(exists_constraint.constraint_type, ConstraintType::Exists);
+        assert!(exists_constraint.options.contains_key("allow_empty"));
+    }
+
+    #[test]
+    fn test_aggregation_query_creation_should_work() {
+        // TDD: AggregationQuery should support different functions
+        let count_query = AggregationQuery::count()
+            .group_by("label")
+            .with_filter("active", serde_json::json!(true));
+
+        assert_eq!(count_query.function, AggregationFunction::Count);
+        assert_eq!(count_query.group_by, vec!["label"]);
+        assert!(count_query.filters.contains_key("active"));
+
+        let avg_query = AggregationQuery::avg("age").group_by("department");
+
+        assert_eq!(avg_query.function, AggregationFunction::Avg);
+        assert_eq!(avg_query.property, Some("age".to_string()));
+        assert_eq!(avg_query.group_by, vec!["department"]);
+    }
+
+    #[test]
+    fn test_weighted_path_creation_should_work() {
+        // TDD: WeightedPath should calculate weights correctly
+        let node1 = GraphNode::new().with_label("A");
+        let node2 = GraphNode::new().with_label("B");
+        let node3 = GraphNode::new().with_label("C");
+        let rel1 = GraphRelationship::new("1", "2", "TO");
+        let rel2 = GraphRelationship::new("2", "3", "TO");
+
+        let path = GraphPath::new()
+            .add_node(node1)
+            .add_relationship(rel1)
+            .add_node(node2)
+            .add_relationship(rel2)
+            .add_node(node3);
+
+        let edge_weights = vec![2.5, 3.0];
+        let weighted_path = WeightedPath::new(path, edge_weights.clone(), WeightMethod::Sum);
+
+        assert_eq!(weighted_path.total_weight, 5.5);
+        assert_eq!(weighted_path.edge_weights, edge_weights);
+        assert_eq!(weighted_path.weight_method, WeightMethod::Sum);
+
+        let avg_weighted_path = WeightedPath::new(
+            weighted_path.path.clone(),
+            edge_weights.clone(),
+            WeightMethod::Average,
+        );
+        assert_eq!(avg_weighted_path.total_weight, 2.75);
+    }
+
+    #[test]
+    fn test_temporal_query_creation_should_work() {
+        // TDD: TemporalQuery should support different time operations
+        use chrono::TimeZone;
+
+        let time1 = Utc.with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap();
+        let time2 = Utc.with_ymd_and_hms(2024, 12, 31, 23, 59, 59).unwrap();
+
+        let at_query = TemporalQuery::at(time1, "created_at");
+        assert_eq!(at_query.operation, TemporalOperation::At);
+        assert_eq!(at_query.start_time, Some(time1));
+        assert_eq!(at_query.end_time, Some(time1));
+
+        let between_query = TemporalQuery::between(time1, time2, "updated_at");
+        assert_eq!(between_query.operation, TemporalOperation::Between);
+        assert_eq!(between_query.start_time, Some(time1));
+        assert_eq!(between_query.end_time, Some(time2));
+
+        let before_query = TemporalQuery::before(time2, "expires_at");
+        assert_eq!(before_query.operation, TemporalOperation::Before);
+        assert_eq!(before_query.start_time, None);
+        assert_eq!(before_query.end_time, Some(time2));
+
+        let after_query = TemporalQuery::after(time1, "starts_at");
+        assert_eq!(after_query.operation, TemporalOperation::After);
+        assert_eq!(after_query.start_time, Some(time1));
+        assert_eq!(after_query.end_time, None);
+    }
+
+    #[test]
+    fn test_bulk_operation_configuration_should_work() {
+        // TDD: BulkOperation should be configurable
+        let nodes = vec![
+            GraphNode::new().with_label("Person"),
+            GraphNode::new().with_label("Person"),
+            GraphNode::new().with_label("Person"),
+        ];
+
+        let bulk_op = BulkOperation::new(nodes.clone())
+            .with_batch_size(100)
+            .continue_on_error()
+            .with_metadata("operation_id", serde_json::json!("bulk_001"));
+
+        assert_eq!(bulk_op.items.len(), 3);
+        assert_eq!(bulk_op.batch_size, 100);
+        assert!(bulk_op.continue_on_error);
+        assert_eq!(bulk_op.metadata.get("operation_id"), Some(&serde_json::json!("bulk_001")));
+    }
+
+    #[test]
+    fn test_new_types_serialization_should_work() {
+        // TDD: All new types should serialize/deserialize correctly
+        let graph_info = GraphInfo::new("test_graph", "Test Graph");
+        let serialized = serde_json::to_string(&graph_info).unwrap();
+        let deserialized: GraphInfo = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(graph_info, deserialized);
+
+        let tx_context = TransactionContext::new();
+        let serialized = serde_json::to_string(&tx_context).unwrap();
+        let deserialized: TransactionContext = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(tx_context, deserialized);
+
+        let isolation_level = IsolationLevel::Serializable;
+        let serialized = serde_json::to_string(&isolation_level).unwrap();
+        let deserialized: IsolationLevel = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(isolation_level, deserialized);
     }
 }
