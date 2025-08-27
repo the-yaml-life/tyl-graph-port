@@ -25,7 +25,7 @@ async fn main() -> TylResult<()> {
     {
         // Create a mock graph store for demonstration
         let store = MockGraphStore::new();
-        
+
         // Create a test graph
         let graph_info = GraphInfo {
             name: "Test Graph".to_string(),
@@ -124,7 +124,9 @@ async fn basic_node_operations(store: &MockGraphStore) -> TylResult<()> {
             .with_property("department", serde_json::json!("Sales")),
     ];
 
-    let batch_results = store.create_nodes_batch(TEST_GRAPH_ID, additional_employees).await?;
+    let batch_results = store
+        .create_nodes_batch(TEST_GRAPH_ID, additional_employees)
+        .await?;
     let successful_creates = batch_results.iter().filter(|r| r.is_ok()).count();
     println!("✅ Batch created {successful_creates} additional employees");
 
@@ -167,7 +169,9 @@ async fn basic_relationship_operations(store: &MockGraphStore) -> TylResult<()> 
         // Create the relationships
         let work1_id = store.create_relationship(TEST_GRAPH_ID, work_rel1).await?;
         let work2_id = store.create_relationship(TEST_GRAPH_ID, work_rel2).await?;
-        let colleague_id = store.create_relationship(TEST_GRAPH_ID, colleague_rel).await?;
+        let colleague_id = store
+            .create_relationship(TEST_GRAPH_ID, colleague_rel)
+            .await?;
 
         println!("✅ Created relationships:");
         println!("   - Alice WORKS_FOR TechCorp: {work1_id}");
@@ -177,7 +181,9 @@ async fn basic_relationship_operations(store: &MockGraphStore) -> TylResult<()> 
         // Update a relationship
         let mut rel_updates = HashMap::new();
         rel_updates.insert("performance_rating".to_string(), serde_json::json!("Excellent"));
-        store.update_relationship(TEST_GRAPH_ID, &work1_id, rel_updates).await?;
+        store
+            .update_relationship(TEST_GRAPH_ID, &work1_id, rel_updates)
+            .await?;
 
         println!("✅ Updated Alice's work relationship with performance rating");
 
@@ -234,7 +240,9 @@ async fn graph_traversal_examples(store: &MockGraphStore) -> TylResult<()> {
             .with_relationship_type("WORKS_FOR")
             .with_max_depth(2);
 
-        let work_neighbors = store.get_neighbors(TEST_GRAPH_ID, &alice.id, work_params).await?;
+        let work_neighbors = store
+            .get_neighbors(TEST_GRAPH_ID, &alice.id, work_params)
+            .await?;
         let work_count = work_neighbors.len();
         println!("🏢 Alice's work-related connections: {work_count}");
 
@@ -271,7 +279,9 @@ async fn graph_traversal_examples(store: &MockGraphStore) -> TylResult<()> {
         // Explore reachable nodes
         let reachable_params = TraversalParams::new().with_max_depth(3).with_limit(10);
 
-        let reachable = store.traverse_from(TEST_GRAPH_ID, &alice.id, reachable_params).await?;
+        let reachable = store
+            .traverse_from(TEST_GRAPH_ID, &alice.id, reachable_params)
+            .await?;
         let reachable_count = reachable.len();
         println!("🌐 Nodes reachable from Alice (depth 3): {reachable_count}");
 
@@ -403,14 +413,19 @@ async fn query_execution_examples(store: &MockGraphStore) -> TylResult<()> {
     .with_parameter("creator", serde_json::json!("basic_usage_example"))
     .with_parameter("time", serde_json::json!(chrono::Utc::now().to_rfc3339()));
 
-    let write_result = store.execute_write_query(TEST_GRAPH_ID, write_query).await?;
+    let write_result = store
+        .execute_write_query(TEST_GRAPH_ID, write_query)
+        .await?;
     println!("✏️  Write query executed successfully");
     let write_metadata_count = write_result.metadata.len();
     println!("   - Metadata entries: {write_metadata_count}");
 
     // Demonstrate query validation
     let invalid_write_as_read = GraphQuery::write("INSERT INTO test_nodes DEFAULT VALUES");
-    match store.execute_read_query(TEST_GRAPH_ID, invalid_write_as_read).await {
+    match store
+        .execute_read_query(TEST_GRAPH_ID, invalid_write_as_read)
+        .await
+    {
         Ok(_) => println!("❌ Unexpected success"),
         Err(_) => {
             println!("✅ Query validation working: write query rejected for read-only execution")

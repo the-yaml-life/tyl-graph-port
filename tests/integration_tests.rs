@@ -23,8 +23,11 @@ async fn setup_test_store() -> TylResult<MockGraphStore> {
     let store = MockGraphStore::new();
     let mut metadata = HashMap::new();
     metadata.insert("name".to_string(), serde_json::json!("Test Graph"));
-    metadata.insert("description".to_string(), serde_json::json!("A test graph for integration tests"));
-    
+    metadata.insert(
+        "description".to_string(),
+        serde_json::json!("A test graph for integration tests"),
+    );
+
     let graph_info = GraphInfo {
         id: TEST_GRAPH_ID.to_string(),
         metadata,
@@ -403,7 +406,9 @@ async fn test_error_handling_integration() -> TylResult<()> {
     // Test updating non-existent node
     let mut updates = HashMap::new();
     updates.insert("key".to_string(), serde_json::json!("value"));
-    let result = store.update_node(TEST_GRAPH_ID, "non_existent", updates).await;
+    let result = store
+        .update_node(TEST_GRAPH_ID, "non_existent", updates)
+        .await;
     assert!(result.is_err());
 
     // Test creating relationship with non-existent nodes
@@ -521,10 +526,17 @@ async fn test_serialization_consistency() -> TylResult<()> {
         .with_property("array_value", serde_json::json!(["a", "b", "c"]))
         .with_property("object_value", serde_json::json!({"nested": "value"}));
 
-    let node_id = store.create_node(TEST_GRAPH_ID, node.clone()).await.unwrap();
+    let node_id = store
+        .create_node(TEST_GRAPH_ID, node.clone())
+        .await
+        .unwrap();
 
     // Retrieve and verify data integrity
-    let retrieved = store.get_node(TEST_GRAPH_ID, &node_id).await.unwrap().unwrap();
+    let retrieved = store
+        .get_node(TEST_GRAPH_ID, &node_id)
+        .await
+        .unwrap()
+        .unwrap();
 
     // Serialize and deserialize to test consistency
     let serialized = serde_json::to_string(&retrieved).unwrap();
@@ -545,7 +557,11 @@ async fn test_serialization_consistency() -> TylResult<()> {
     );
 
     let rel_id = store.create_relationship(TEST_GRAPH_ID, rel).await.unwrap();
-    let retrieved_rel = store.get_relationship(TEST_GRAPH_ID, &rel_id).await.unwrap().unwrap();
+    let retrieved_rel = store
+        .get_relationship(TEST_GRAPH_ID, &rel_id)
+        .await
+        .unwrap()
+        .unwrap();
 
     let rel_serialized = serde_json::to_string(&retrieved_rel).unwrap();
     let rel_deserialized: GraphRelationship = serde_json::from_str(&rel_serialized).unwrap();
@@ -567,7 +583,10 @@ async fn test_concurrent_access() -> TylResult<()> {
     let initial_node = GraphNode::with_id("shared_node")
         .with_label("SharedNode")
         .with_property("counter", serde_json::json!(0));
-    store.create_node(TEST_GRAPH_ID, initial_node).await.unwrap();
+    store
+        .create_node(TEST_GRAPH_ID, initial_node)
+        .await
+        .unwrap();
 
     // Spawn multiple tasks that update the same node
     let mut handles = Vec::new();

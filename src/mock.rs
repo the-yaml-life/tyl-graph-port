@@ -2060,10 +2060,8 @@ impl GraphConstraintManager for MockGraphStore {
                                         "constraint".to_string(),
                                         serde_json::json!(constraint.name),
                                     );
-                                    violation.insert(
-                                        "type".to_string(),
-                                        serde_json::json!("exists"),
-                                    );
+                                    violation
+                                        .insert("type".to_string(), serde_json::json!("exists"));
                                     violation.insert(
                                         "property".to_string(),
                                         serde_json::json!(property),
