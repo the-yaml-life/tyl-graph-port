@@ -27,12 +27,16 @@ async fn main() -> TylResult<()> {
         let store = MockGraphStore::new();
 
         // Create a test graph
+        let mut metadata = HashMap::new();
+        metadata.insert("name".to_string(), serde_json::json!("Test Graph"));
+        metadata.insert("description".to_string(), serde_json::json!("A test graph for demonstrations"));
+        
         let graph_info = GraphInfo {
-            name: "Test Graph".to_string(),
-            description: Some("A test graph for demonstrations".to_string()),
+            id: TEST_GRAPH_ID.to_string(),
+            metadata,
             ..Default::default()
         };
-        store.create_graph(TEST_GRAPH_ID, graph_info).await?;
+        store.create_graph(graph_info).await?;
 
         // Demonstrate the complete workflow
         basic_node_operations(&store).await?;
@@ -140,10 +144,10 @@ async fn basic_relationship_operations(store: &MockGraphStore) -> TylResult<()> 
 
     // Find our previously created nodes
     let people = store
-        .find_nodes(vec!["Person".to_string()], HashMap::new())
+        .find_nodes(TEST_GRAPH_ID, vec!["Person".to_string()], HashMap::new())
         .await?;
     let companies = store
-        .find_nodes(vec!["Company".to_string()], HashMap::new())
+        .find_nodes(TEST_GRAPH_ID, vec!["Company".to_string()], HashMap::new())
         .await?;
 
     if people.len() >= 2 && !companies.is_empty() {
@@ -189,7 +193,7 @@ async fn basic_relationship_operations(store: &MockGraphStore) -> TylResult<()> 
 
         // Query relationships
         let work_relationships = store
-            .find_relationships(vec!["WORKS_FOR".to_string()], HashMap::new())
+            .find_relationships(TEST_GRAPH_ID, vec!["WORKS_FOR".to_string()], HashMap::new())
             .await?;
 
         let rel_count = work_relationships.len();
@@ -211,7 +215,7 @@ async fn graph_traversal_examples(store: &MockGraphStore) -> TylResult<()> {
     println!("----------------------------");
 
     let people = store
-        .find_nodes(vec!["Person".to_string()], HashMap::new())
+        .find_nodes(TEST_GRAPH_ID, vec!["Person".to_string()], HashMap::new())
         .await?;
 
     if !people.is_empty() {
@@ -219,7 +223,7 @@ async fn graph_traversal_examples(store: &MockGraphStore) -> TylResult<()> {
 
         // Find Alice's neighbors
         let neighbors = store
-            .get_neighbors(&alice.id, TraversalParams::default())
+            .get_neighbors(TEST_GRAPH_ID, &alice.id, TraversalParams::default())
             .await?;
         let neighbor_count = neighbors.len();
         println!("👥 Alice's neighbors ({neighbor_count} found):");
@@ -250,7 +254,7 @@ async fn graph_traversal_examples(store: &MockGraphStore) -> TylResult<()> {
         if people.len() >= 2 {
             let bob = &people[1];
             let path = store
-                .find_shortest_path(&alice.id, &bob.id, TraversalParams::default())
+                .find_shortest_path(TEST_GRAPH_ID, &alice.id, &bob.id, TraversalParams::default())
                 .await?;
 
             if let Some(path) = path {
@@ -305,14 +309,14 @@ async fn graph_analytics_examples(store: &MockGraphStore) -> TylResult<()> {
     println!("--------------------------");
 
     let people = store
-        .find_nodes(vec!["Person".to_string()], HashMap::new())
+        .find_nodes(TEST_GRAPH_ID, vec!["Person".to_string()], HashMap::new())
         .await?;
 
     if !people.is_empty() {
         // Calculate degree centrality for all people
         let person_ids: Vec<String> = people.iter().map(|p| p.id.clone()).collect();
         let centrality = store
-            .calculate_centrality(person_ids.clone(), CentralityType::Degree)
+            .calculate_centrality(TEST_GRAPH_ID, person_ids.clone(), CentralityType::Degree)
             .await?;
 
         println!("🎯 Degree Centrality Scores:");
@@ -326,7 +330,7 @@ async fn graph_analytics_examples(store: &MockGraphStore) -> TylResult<()> {
 
         // Detect communities
         let communities = store
-            .detect_communities(ClusteringAlgorithm::Louvain, HashMap::new())
+            .detect_communities(TEST_GRAPH_ID, ClusteringAlgorithm::Louvain, HashMap::new())
             .await?;
 
         println!("🏘️  Community Detection:");
@@ -357,7 +361,7 @@ async fn graph_analytics_examples(store: &MockGraphStore) -> TylResult<()> {
         // Get relationship recommendations
         if let Some(alice) = people.first() {
             let recommendations = store
-                .recommend_relationships(&alice.id, RecommendationType::CommonNeighbors, 3)
+                .recommend_relationships(TEST_GRAPH_ID, &alice.id, RecommendationType::CommonNeighbors, 3)
                 .await?;
 
             println!(
@@ -466,32 +470,35 @@ async fn health_monitoring_examples(store: &MockGraphStore) -> TylResult<()> {
     }
 
     // System statistics
-    let stats = store.get_all_statistics(TEST_GRAPH_ID).await?;
+    let stats = store.get_all_statistics().await?;
     println!("📊 System Statistics:");
 
-    if let Some(node_count) = stats.get("node_count") {
-        println!("   - Total Nodes: {node_count}");
-    }
+    // Get statistics for TEST_GRAPH_ID
+    if let Some(graph_stats) = stats.get(TEST_GRAPH_ID) {
+        if let Some(node_count) = graph_stats.get("node_count") {
+            println!("   - Total Nodes: {}", node_count.as_u64().unwrap_or(0));
+        }
 
-    if let Some(rel_count) = stats.get("relationship_count") {
-        println!("   - Total Relationships: {rel_count}");
-    }
+        if let Some(rel_count) = graph_stats.get("relationship_count") {
+            println!("   - Total Relationships: {}", rel_count.as_u64().unwrap_or(0));
+        }
 
-    if let Some(labels) = stats.get("labels") {
-        println!("   - Node Labels:");
-        if let Ok(label_counts) = serde_json::from_value::<HashMap<String, usize>>(labels.clone()) {
-            for (label, count) in label_counts {
-                println!("     * {label}: {count} nodes");
+        if let Some(labels) = graph_stats.get("labels") {
+            println!("   - Node Labels:");
+            if let Ok(label_counts) = serde_json::from_value::<HashMap<String, usize>>(labels.clone()) {
+                for (label, count) in label_counts {
+                    println!("     * {label}: {count} nodes");
+                }
             }
         }
-    }
 
-    if let Some(rel_types) = stats.get("relationship_types") {
-        println!("   - Relationship Types:");
-        if let Ok(type_counts) = serde_json::from_value::<HashMap<String, usize>>(rel_types.clone())
-        {
-            for (rel_type, count) in type_counts {
-                println!("     * {rel_type}: {count} relationships");
+        if let Some(rel_types) = graph_stats.get("relationship_types") {
+            println!("   - Relationship Types:");
+            if let Ok(type_counts) = serde_json::from_value::<HashMap<String, usize>>(rel_types.clone())
+            {
+                for (rel_type, count) in type_counts {
+                    println!("     * {rel_type}: {count} relationships");
+                }
             }
         }
     }
