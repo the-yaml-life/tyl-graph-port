@@ -15,12 +15,31 @@ use tyl_graph_port::*;
 #[cfg(feature = "mock")]
 use tyl_graph_port::MockGraphStore;
 
+const TEST_GRAPH_ID: &str = "test_graph";
+
+/// Setup a test graph store with a default graph
+#[cfg(feature = "mock")]
+async fn setup_test_store() -> TylResult<MockGraphStore> {
+    let store = MockGraphStore::new();
+    let mut metadata = HashMap::new();
+    metadata.insert("name".to_string(), serde_json::json!("Test Graph"));
+    metadata.insert("description".to_string(), serde_json::json!("A test graph for integration tests"));
+    
+    let graph_info = GraphInfo {
+        id: TEST_GRAPH_ID.to_string(),
+        metadata,
+        ..Default::default()
+    };
+    store.create_graph(graph_info).await?;
+    Ok(store)
+}
+
 /// Test the complete graph storage workflow
 #[cfg(feature = "mock")]
 #[tokio::test]
-async fn test_complete_graph_storage_workflow() {
+async fn test_complete_graph_storage_workflow() -> TylResult<()> {
     // TDD: Complete workflow from creation to deletion with multi-graph support
-    let store = MockGraphStore::new();
+    let store = setup_test_store().await?;
     let graph_id = "test-graph";
 
     // First create the graph
@@ -65,12 +84,12 @@ async fn test_complete_graph_storage_workflow() {
     ];
 
     for rel in relationships {
-        let _rel_id = store.create_relationship(graph_id, rel).await.unwrap();
+        let _rel_id = store.create_relationship(TEST_GRAPH_ID, rel).await.unwrap();
     }
 
     // Verify the graph structure
-    assert_eq!(store.node_count(graph_id).await, 3);
-    assert_eq!(store.relationship_count(graph_id).await, 3);
+    assert_eq!(store.node_count(TEST_GRAPH_ID).await, 3);
+    assert_eq!(store.relationship_count(TEST_GRAPH_ID).await, 3);
 
     // Test finding nodes by criteria
     let people = store
@@ -94,19 +113,20 @@ async fn test_complete_graph_storage_workflow() {
 
     // Cleanup
     for node_id in node_ids {
-        store.delete_node(graph_id, &node_id).await.unwrap();
+        store.delete_node(TEST_GRAPH_ID, &node_id).await.unwrap();
     }
 
-    assert_eq!(store.node_count(graph_id).await, 0);
-    assert_eq!(store.relationship_count(graph_id).await, 0);
+    assert_eq!(store.node_count(TEST_GRAPH_ID).await, 0);
+    assert_eq!(store.relationship_count(TEST_GRAPH_ID).await, 0);
+    Ok(())
 }
 
 /// Test complex graph traversal scenarios
 #[cfg(feature = "mock")]
 #[tokio::test]
-async fn test_complex_graph_traversal() {
+async fn test_complex_graph_traversal() -> TylResult<()> {
     // TDD: Complex graph traversal with filters and constraints with multi-graph support
-    let store = MockGraphStore::new();
+    let store = setup_test_store().await?;
     let graph_id = "traversal-graph";
 
     // First create the graph
@@ -146,7 +166,7 @@ async fn test_complex_graph_traversal() {
     ];
 
     for node in nodes {
-        store.create_node(graph_id, node).await.unwrap();
+        store.create_node(TEST_GRAPH_ID, node).await.unwrap();
     }
 
     let relationships = vec![
@@ -160,7 +180,7 @@ async fn test_complex_graph_traversal() {
     ];
 
     for rel in relationships {
-        store.create_relationship(graph_id, rel).await.unwrap();
+        store.create_relationship(TEST_GRAPH_ID, rel).await.unwrap();
     }
 
     // Test filtered traversal - only horizontal relationships
@@ -217,9 +237,9 @@ async fn test_complex_graph_traversal() {
 /// Test graph analytics functionality
 #[cfg(feature = "mock")]
 #[tokio::test]
-async fn test_graph_analytics_integration() {
+async fn test_graph_analytics_integration() -> TylResult<()> {
     // TDD: Graph analytics with real graph data with multi-graph support
-    let store = MockGraphStore::new();
+    let store = setup_test_store().await?;
     let graph_id = "analytics-graph";
 
     // First create the graph
@@ -237,7 +257,7 @@ async fn test_graph_analytics_integration() {
         .with_label("Hub")
         .with_property("type", serde_json::json!("central"));
 
-    store.create_node(graph_id, center_node).await.unwrap();
+    store.create_node(TEST_GRAPH_ID, center_node).await.unwrap();
 
     let spoke_nodes = (1..=5)
         .map(|i| {
@@ -248,13 +268,13 @@ async fn test_graph_analytics_integration() {
         .collect::<Vec<_>>();
 
     for node in spoke_nodes {
-        store.create_node(graph_id, node).await.unwrap();
+        store.create_node(TEST_GRAPH_ID, node).await.unwrap();
     }
 
     // Connect all spokes to center
     for i in 1..=5 {
         let rel = GraphRelationship::new("center", format!("spoke_{i}"), "CONNECTS_TO");
-        store.create_relationship(graph_id, rel).await.unwrap();
+        store.create_relationship(TEST_GRAPH_ID, rel).await.unwrap();
     }
 
     // Test centrality calculation
@@ -289,9 +309,9 @@ async fn test_graph_analytics_integration() {
 /// Test query execution functionality
 #[cfg(feature = "mock")]
 #[tokio::test]
-async fn test_query_execution_integration() {
+async fn test_query_execution_integration() -> TylResult<()> {
     // TDD: Query execution with proper validation with multi-graph support
-    let store = MockGraphStore::new();
+    let store = setup_test_store().await?;
     let graph_id = "query-graph";
 
     // First create the graph
@@ -337,15 +357,15 @@ async fn test_query_execution_integration() {
 /// Test health monitoring functionality
 #[cfg(feature = "mock")]
 #[tokio::test]
-async fn test_health_monitoring_integration() {
+async fn test_health_monitoring_integration() -> TylResult<()> {
     // TDD: Health monitoring with comprehensive checks
-    let store = MockGraphStore::new();
+    let store = setup_test_store().await?;
 
     // Add some test data
     let node = GraphNode::new()
         .with_label("TestNode")
         .with_property("test", serde_json::json!(true));
-    store.create_node(node).await.unwrap();
+    store.create_node(TEST_GRAPH_ID, node).await.unwrap();
 
     // Test basic health check
     let is_healthy = store.is_healthy().await.unwrap();
@@ -359,7 +379,7 @@ async fn test_health_monitoring_integration() {
     assert!(health_info.contains_key("version"));
 
     // Test statistics with real data
-    let stats = store.get_statistics().await.unwrap();
+    let stats = store.get_all_statistics(TEST_GRAPH_ID).await.unwrap();
     assert_eq!(stats.get("node_count"), Some(&serde_json::json!(1)));
     assert_eq!(stats.get("relationship_count"), Some(&serde_json::json!(0)));
 
@@ -372,23 +392,23 @@ async fn test_health_monitoring_integration() {
 /// Test error handling and edge cases
 #[cfg(feature = "mock")]
 #[tokio::test]
-async fn test_error_handling_integration() {
+async fn test_error_handling_integration() -> TylResult<()> {
     // TDD: Proper error handling throughout the system
-    let store = MockGraphStore::new();
+    let store = setup_test_store().await?;
 
     // Test getting non-existent node
-    let result = store.get_node("non_existent").await.unwrap();
+    let result = store.get_node(TEST_GRAPH_ID, "non_existent").await.unwrap();
     assert!(result.is_none());
 
     // Test updating non-existent node
     let mut updates = HashMap::new();
     updates.insert("key".to_string(), serde_json::json!("value"));
-    let result = store.update_node("non_existent", updates).await;
+    let result = store.update_node(TEST_GRAPH_ID, "non_existent", updates).await;
     assert!(result.is_err());
 
     // Test creating relationship with non-existent nodes
     let rel = GraphRelationship::new("non_existent_1", "non_existent_2", "TEST");
-    let result = store.create_relationship(rel).await;
+    let result = store.create_relationship(TEST_GRAPH_ID, rel).await;
     assert!(result.is_err());
 
     // Test updating non-existent relationship
@@ -420,9 +440,9 @@ async fn test_error_handling_integration() {
 /// Test performance and scalability aspects
 #[cfg(feature = "mock")]
 #[tokio::test]
-async fn test_performance_and_scalability() {
+async fn test_performance_and_scalability() -> TylResult<()> {
     // TDD: Basic performance characteristics
-    let store = MockGraphStore::new();
+    let store = setup_test_store().await?;
 
     // Create a moderate number of nodes and relationships
     let node_count = 100;
@@ -454,7 +474,7 @@ async fn test_performance_and_scalability() {
         let from_idx = i % node_count;
         let to_idx = (i + 1) % node_count;
         let rel = GraphRelationship::new(&node_ids[from_idx], &node_ids[to_idx], "CONNECTS");
-        store.create_relationship(rel).await.unwrap();
+        store.create_relationship(TEST_GRAPH_ID, rel).await.unwrap();
     }
 
     // Test traversal performance
@@ -487,9 +507,9 @@ async fn test_performance_and_scalability() {
 /// Test serialization and data consistency
 #[cfg(feature = "mock")]
 #[tokio::test]
-async fn test_serialization_consistency() {
+async fn test_serialization_consistency() -> TylResult<()> {
     // TDD: Data consistency through serialization
-    let store = MockGraphStore::new();
+    let store = setup_test_store().await?;
 
     // Create complex node with various data types
     let node = GraphNode::new()
@@ -501,10 +521,10 @@ async fn test_serialization_consistency() {
         .with_property("array_value", serde_json::json!(["a", "b", "c"]))
         .with_property("object_value", serde_json::json!({"nested": "value"}));
 
-    let node_id = store.create_node(node.clone()).await.unwrap();
+    let node_id = store.create_node(TEST_GRAPH_ID, node.clone()).await.unwrap();
 
     // Retrieve and verify data integrity
-    let retrieved = store.get_node(&node_id).await.unwrap().unwrap();
+    let retrieved = store.get_node(TEST_GRAPH_ID, &node_id).await.unwrap().unwrap();
 
     // Serialize and deserialize to test consistency
     let serialized = serde_json::to_string(&retrieved).unwrap();
@@ -524,8 +544,8 @@ async fn test_serialization_consistency() {
         serde_json::json!({"version": 1, "tags": ["test", "integration"]}),
     );
 
-    let rel_id = store.create_relationship(rel).await.unwrap();
-    let retrieved_rel = store.get_relationship(&rel_id).await.unwrap().unwrap();
+    let rel_id = store.create_relationship(TEST_GRAPH_ID, rel).await.unwrap();
+    let retrieved_rel = store.get_relationship(TEST_GRAPH_ID, &rel_id).await.unwrap().unwrap();
 
     let rel_serialized = serde_json::to_string(&retrieved_rel).unwrap();
     let rel_deserialized: GraphRelationship = serde_json::from_str(&rel_serialized).unwrap();
@@ -539,7 +559,7 @@ async fn test_serialization_consistency() {
 /// Test concurrent access patterns
 #[cfg(feature = "mock")]
 #[tokio::test]
-async fn test_concurrent_access() {
+async fn test_concurrent_access() -> TylResult<()> {
     // TDD: Basic concurrent access safety
     let store = std::sync::Arc::new(MockGraphStore::new());
 
@@ -547,7 +567,7 @@ async fn test_concurrent_access() {
     let initial_node = GraphNode::with_id("shared_node")
         .with_label("SharedNode")
         .with_property("counter", serde_json::json!(0));
-    store.create_node(initial_node).await.unwrap();
+    store.create_node(TEST_GRAPH_ID, initial_node).await.unwrap();
 
     // Spawn multiple tasks that update the same node
     let mut handles = Vec::new();
@@ -569,13 +589,13 @@ async fn test_concurrent_access() {
     }
 
     // Verify node still exists and is accessible
-    let final_node = store.get_node("shared_node").await.unwrap();
+    let final_node = store.get_node(TEST_GRAPH_ID, "shared_node").await.unwrap();
     assert!(final_node.is_some());
 }
 
 /// Test integration with TYL error framework
 #[tokio::test]
-async fn test_tyl_error_integration() {
+async fn test_tyl_error_integration() -> TylResult<()> {
     // TDD: Proper integration with TYL error types
 
     // Test error creation and categorization

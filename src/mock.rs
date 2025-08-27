@@ -725,7 +725,7 @@ impl GraphTraversal for MockGraphStore {
         }
 
         // Reconstruct path if found
-        if let Some(_) = distances.get(to_id) {
+        if distances.contains_key(to_id) {
             let mut path_nodes = Vec::new();
             let mut path_relationships = Vec::new();
             let mut edge_weights = Vec::new();
@@ -946,10 +946,10 @@ impl GraphTraversal for MockGraphStore {
 
         for relationship in graph.relationships.values() {
             // Check relationship types
-            if !relationship_types.is_empty() {
-                if !relationship_types.contains(&relationship.relationship_type) {
-                    continue;
-                }
+            if !relationship_types.is_empty()
+                && !relationship_types.contains(&relationship.relationship_type)
+            {
+                continue;
             }
 
             // Check properties
@@ -993,9 +993,9 @@ impl GraphTraversal for MockGraphStore {
                         let timestamp_utc = timestamp.with_timezone(&chrono::Utc);
 
                         let matches = match temporal_query.operation {
-                            TemporalOperation::At => temporal_query
-                                .start_time
-                                .map_or(false, |t| timestamp_utc == t),
+                            TemporalOperation::At => {
+                                temporal_query.start_time == Some(timestamp_utc)
+                            }
                             TemporalOperation::Between => {
                                 match (temporal_query.start_time, temporal_query.end_time) {
                                     (Some(start), Some(end)) => {
@@ -1005,11 +1005,11 @@ impl GraphTraversal for MockGraphStore {
                                 }
                             }
                             TemporalOperation::Before => {
-                                temporal_query.end_time.map_or(false, |t| timestamp_utc < t)
+                                temporal_query.end_time.is_some_and(|t| timestamp_utc < t)
                             }
-                            TemporalOperation::After => temporal_query
-                                .start_time
-                                .map_or(false, |t| timestamp_utc > t),
+                            TemporalOperation::After => {
+                                temporal_query.start_time.is_some_and(|t| timestamp_utc > t)
+                            }
                         };
 
                         if matches {
@@ -1045,9 +1045,9 @@ impl GraphTraversal for MockGraphStore {
                         let timestamp_utc = timestamp.with_timezone(&chrono::Utc);
 
                         let matches = match temporal_query.operation {
-                            TemporalOperation::At => temporal_query
-                                .start_time
-                                .map_or(false, |t| timestamp_utc == t),
+                            TemporalOperation::At => {
+                                temporal_query.start_time == Some(timestamp_utc)
+                            }
                             TemporalOperation::Between => {
                                 match (temporal_query.start_time, temporal_query.end_time) {
                                     (Some(start), Some(end)) => {
@@ -1057,11 +1057,11 @@ impl GraphTraversal for MockGraphStore {
                                 }
                             }
                             TemporalOperation::Before => {
-                                temporal_query.end_time.map_or(false, |t| timestamp_utc < t)
+                                temporal_query.end_time.is_some_and(|t| timestamp_utc < t)
                             }
-                            TemporalOperation::After => temporal_query
-                                .start_time
-                                .map_or(false, |t| timestamp_utc > t),
+                            TemporalOperation::After => {
+                                temporal_query.start_time.is_some_and(|t| timestamp_utc > t)
+                            }
                         };
 
                         if matches {
@@ -1198,7 +1198,7 @@ impl GraphAnalytics for MockGraphStore {
 
                     // BFS to find connected component
                     let mut queue = VecDeque::new();
-                    let community_name = format!("community_{}", community_id);
+                    let community_name = format!("community_{community_id}");
 
                     queue.push_back(node_id.clone());
                     visited.insert(node_id.clone());
@@ -1232,7 +1232,7 @@ impl GraphAnalytics for MockGraphStore {
                 // Simplified label propagation - assign by node labels
                 for (node_id, node) in &graph.nodes {
                     let community = if let Some(primary_label) = node.labels.first() {
-                        format!("label_{}", primary_label)
+                        format!("label_{primary_label}")
                     } else {
                         "unlabeled".to_string()
                     };
@@ -1250,7 +1250,7 @@ impl GraphAnalytics for MockGraphStore {
                     }
 
                     let mut queue = VecDeque::new();
-                    let component_name = format!("component_{}", component_id);
+                    let component_name = format!("component_{component_id}");
 
                     queue.push_back(node_id.clone());
                     visited.insert(node_id.clone());
@@ -1289,7 +1289,7 @@ impl GraphAnalytics for MockGraphStore {
                     }
                     // BFS to find connected component with refinement
                     let mut queue = VecDeque::new();
-                    let community_name = format!("leiden_community_{}", community_id);
+                    let community_name = format!("leiden_community_{community_id}");
 
                     queue.push_back(node_id.clone());
                     visited.insert(node_id.clone());
@@ -1491,7 +1491,7 @@ impl GraphAnalytics for MockGraphStore {
                     .filter(|rel| rel.from_node_id == node_id || rel.to_node_id == node_id)
                     .count();
 
-                for (candidate_id, _) in &graph.nodes {
+                for candidate_id in graph.nodes.keys() {
                     if candidate_id == node_id {
                         continue;
                     }
@@ -1524,7 +1524,7 @@ impl GraphAnalytics for MockGraphStore {
                 // Find nodes at similar distances from common nodes
                 let mut path_similarities: HashMap<String, f64> = HashMap::new();
 
-                for (candidate_id, _) in &graph.nodes {
+                for candidate_id in graph.nodes.keys() {
                     if candidate_id == node_id {
                         continue;
                     }
@@ -1937,10 +1937,7 @@ impl GraphConstraintManager for MockGraphStore {
                                 if !seen_values.insert(value.clone()) {
                                     return Err(TylError::validation(
                                         "unique_constraint",
-                                        format!(
-                                            "Duplicate value found for property '{}'",
-                                            property
-                                        ),
+                                        format!("Duplicate value found for property '{property}"),
                                     ));
                                 }
                             }
@@ -2051,30 +2048,29 @@ impl GraphConstraintManager for MockGraphStore {
                     ConstraintType::Exists => {
                         for property in &constraint.properties {
                             for (node_id, node) in &graph.nodes {
-                                if constraint.labels_or_types.is_empty()
+                                if (constraint.labels_or_types.is_empty()
                                     || node
                                         .labels
                                         .iter()
-                                        .any(|l| constraint.labels_or_types.contains(l))
+                                        .any(|l| constraint.labels_or_types.contains(l)))
+                                    && !node.properties.contains_key(property)
                                 {
-                                    if !node.properties.contains_key(property) {
-                                        let mut violation = HashMap::new();
-                                        violation.insert(
-                                            "constraint".to_string(),
-                                            serde_json::json!(constraint.name),
-                                        );
-                                        violation.insert(
-                                            "type".to_string(),
-                                            serde_json::json!("exists"),
-                                        );
-                                        violation.insert(
-                                            "property".to_string(),
-                                            serde_json::json!(property),
-                                        );
-                                        violation
-                                            .insert("node".to_string(), serde_json::json!(node_id));
-                                        violations.push(violation);
-                                    }
+                                    let mut violation = HashMap::new();
+                                    violation.insert(
+                                        "constraint".to_string(),
+                                        serde_json::json!(constraint.name),
+                                    );
+                                    violation.insert(
+                                        "type".to_string(),
+                                        serde_json::json!("exists"),
+                                    );
+                                    violation.insert(
+                                        "property".to_string(),
+                                        serde_json::json!(property),
+                                    );
+                                    violation
+                                        .insert("node".to_string(), serde_json::json!(node_id));
+                                    violations.push(violation);
                                 }
                             }
                         }
@@ -2217,7 +2213,7 @@ impl GraphBulkOperations for MockGraphStore {
             }
             _ => Err(TylError::validation(
                 "export_format",
-                format!("Unsupported format: {}", export_format),
+                format!("Unsupported format: {export_format}"),
             )),
         }
     }

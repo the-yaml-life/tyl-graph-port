@@ -14,6 +14,8 @@ use tyl_graph_port::*;
 #[cfg(feature = "mock")]
 use tyl_graph_port::MockGraphStore;
 
+const TEST_GRAPH_ID: &str = "test_graph";
+
 #[tokio::main]
 async fn main() -> TylResult<()> {
     println!("🚀 TYL Graph Port - Basic Usage Example");
@@ -23,6 +25,14 @@ async fn main() -> TylResult<()> {
     {
         // Create a mock graph store for demonstration
         let store = MockGraphStore::new();
+        
+        // Create a test graph
+        let graph_info = GraphInfo {
+            name: "Test Graph".to_string(),
+            description: Some("A test graph for demonstrations".to_string()),
+            ..Default::default()
+        };
+        store.create_graph(TEST_GRAPH_ID, graph_info).await?;
 
         // Demonstrate the complete workflow
         basic_node_operations(&store).await?;
@@ -73,9 +83,9 @@ async fn basic_node_operations(store: &MockGraphStore) -> TylResult<()> {
         .with_property("employees", serde_json::json!(150));
 
     // Create nodes individually
-    let alice_id = store.create_node(person1).await?;
-    let bob_id = store.create_node(person2).await?;
-    let company_id = store.create_node(company).await?;
+    let alice_id = store.create_node(TEST_GRAPH_ID, person1).await?;
+    let bob_id = store.create_node(TEST_GRAPH_ID, person2).await?;
+    let company_id = store.create_node(TEST_GRAPH_ID, company).await?;
 
     println!("✅ Created nodes:");
     println!("   - Alice (Person/Employee): {alice_id}");
@@ -83,7 +93,7 @@ async fn basic_node_operations(store: &MockGraphStore) -> TylResult<()> {
     println!("   - TechCorp (Company): {company_id}");
 
     // Retrieve and display node information
-    if let Some(alice) = store.get_node(&alice_id).await? {
+    if let Some(alice) = store.get_node(TEST_GRAPH_ID, &alice_id).await? {
         println!("📄 Alice's details:");
         println!("   - Labels: {:?}", alice.labels);
         let name = alice.properties.get("name").unwrap();
@@ -96,7 +106,7 @@ async fn basic_node_operations(store: &MockGraphStore) -> TylResult<()> {
     let mut updates = HashMap::new();
     updates.insert("age".to_string(), serde_json::json!(31));
     updates.insert("promotion_date".to_string(), serde_json::json!("2024-01-01"));
-    store.update_node(&alice_id, updates).await?;
+    store.update_node(TEST_GRAPH_ID, &alice_id, updates).await?;
 
     println!("✅ Updated Alice's age and added promotion date");
 
@@ -114,7 +124,7 @@ async fn basic_node_operations(store: &MockGraphStore) -> TylResult<()> {
             .with_property("department", serde_json::json!("Sales")),
     ];
 
-    let batch_results = store.create_nodes_batch(additional_employees).await?;
+    let batch_results = store.create_nodes_batch(TEST_GRAPH_ID, additional_employees).await?;
     let successful_creates = batch_results.iter().filter(|r| r.is_ok()).count();
     println!("✅ Batch created {successful_creates} additional employees");
 
@@ -155,9 +165,9 @@ async fn basic_relationship_operations(store: &MockGraphStore) -> TylResult<()> 
             .with_property("team", serde_json::json!("Product Team"));
 
         // Create the relationships
-        let work1_id = store.create_relationship(work_rel1).await?;
-        let work2_id = store.create_relationship(work_rel2).await?;
-        let colleague_id = store.create_relationship(colleague_rel).await?;
+        let work1_id = store.create_relationship(TEST_GRAPH_ID, work_rel1).await?;
+        let work2_id = store.create_relationship(TEST_GRAPH_ID, work_rel2).await?;
+        let colleague_id = store.create_relationship(TEST_GRAPH_ID, colleague_rel).await?;
 
         println!("✅ Created relationships:");
         println!("   - Alice WORKS_FOR TechCorp: {work1_id}");
@@ -167,7 +177,7 @@ async fn basic_relationship_operations(store: &MockGraphStore) -> TylResult<()> 
         // Update a relationship
         let mut rel_updates = HashMap::new();
         rel_updates.insert("performance_rating".to_string(), serde_json::json!("Excellent"));
-        store.update_relationship(&work1_id, rel_updates).await?;
+        store.update_relationship(TEST_GRAPH_ID, &work1_id, rel_updates).await?;
 
         println!("✅ Updated Alice's work relationship with performance rating");
 
@@ -224,7 +234,7 @@ async fn graph_traversal_examples(store: &MockGraphStore) -> TylResult<()> {
             .with_relationship_type("WORKS_FOR")
             .with_max_depth(2);
 
-        let work_neighbors = store.get_neighbors(&alice.id, work_params).await?;
+        let work_neighbors = store.get_neighbors(TEST_GRAPH_ID, &alice.id, work_params).await?;
         let work_count = work_neighbors.len();
         println!("🏢 Alice's work-related connections: {work_count}");
 
@@ -261,7 +271,7 @@ async fn graph_traversal_examples(store: &MockGraphStore) -> TylResult<()> {
         // Explore reachable nodes
         let reachable_params = TraversalParams::new().with_max_depth(3).with_limit(10);
 
-        let reachable = store.traverse_from(&alice.id, reachable_params).await?;
+        let reachable = store.traverse_from(TEST_GRAPH_ID, &alice.id, reachable_params).await?;
         let reachable_count = reachable.len();
         println!("🌐 Nodes reachable from Alice (depth 3): {reachable_count}");
 
@@ -358,7 +368,7 @@ async fn graph_analytics_examples(store: &MockGraphStore) -> TylResult<()> {
         }
 
         // Find patterns (mock implementation returns empty, but shows the interface)
-        let patterns = store.find_patterns(2, 1).await?;
+        let patterns = store.find_patterns(TEST_GRAPH_ID, 2, 1).await?;
         let pattern_count = patterns.len();
         println!("🔍 Graph Patterns (size 2+): {pattern_count} patterns found");
     }
@@ -375,7 +385,7 @@ async fn query_execution_examples(store: &MockGraphStore) -> TylResult<()> {
     let read_query = GraphQuery::read("SELECT name, department FROM persons ORDER BY name")
         .with_parameter("limit", serde_json::json!(10));
 
-    let read_result = store.execute_read_query(read_query).await?;
+    let read_result = store.execute_read_query(TEST_GRAPH_ID, read_query).await?;
     println!("📊 Read query executed successfully");
     let data_count = read_result.data.len();
     let metadata_count = read_result.metadata.len();
@@ -393,14 +403,14 @@ async fn query_execution_examples(store: &MockGraphStore) -> TylResult<()> {
     .with_parameter("creator", serde_json::json!("basic_usage_example"))
     .with_parameter("time", serde_json::json!(chrono::Utc::now().to_rfc3339()));
 
-    let write_result = store.execute_write_query(write_query).await?;
+    let write_result = store.execute_write_query(TEST_GRAPH_ID, write_query).await?;
     println!("✏️  Write query executed successfully");
     let write_metadata_count = write_result.metadata.len();
     println!("   - Metadata entries: {write_metadata_count}");
 
     // Demonstrate query validation
     let invalid_write_as_read = GraphQuery::write("INSERT INTO test_nodes DEFAULT VALUES");
-    match store.execute_read_query(invalid_write_as_read).await {
+    match store.execute_read_query(TEST_GRAPH_ID, invalid_write_as_read).await {
         Ok(_) => println!("❌ Unexpected success"),
         Err(_) => {
             println!("✅ Query validation working: write query rejected for read-only execution")
@@ -441,7 +451,7 @@ async fn health_monitoring_examples(store: &MockGraphStore) -> TylResult<()> {
     }
 
     // System statistics
-    let stats = store.get_statistics().await?;
+    let stats = store.get_all_statistics(TEST_GRAPH_ID).await?;
     println!("📊 System Statistics:");
 
     if let Some(node_count) = stats.get("node_count") {
