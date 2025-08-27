@@ -235,6 +235,7 @@ async fn test_complex_graph_traversal() -> TylResult<()> {
         .filter(|node| node.labels.contains(&"Level1".to_string()))
         .count();
     assert!(level1_count > 0);
+    Ok(())
 }
 
 /// Test graph analytics functionality
@@ -307,6 +308,7 @@ async fn test_graph_analytics_integration() -> TylResult<()> {
     // Should recommend connections to other spokes (they share the center as common neighbor)
     assert!(!recommendations.is_empty());
     assert!(recommendations.len() <= 3);
+    Ok(())
 }
 
 /// Test query execution functionality
@@ -355,6 +357,7 @@ async fn test_query_execution_integration() -> TylResult<()> {
     let read_query_wrong = GraphQuery::read("SELECT * FROM nodes");
     let result = store.execute_write_query(graph_id, read_query_wrong).await;
     assert!(result.is_err());
+    Ok(())
 }
 
 /// Test health monitoring functionality
@@ -382,14 +385,20 @@ async fn test_health_monitoring_integration() -> TylResult<()> {
     assert!(health_info.contains_key("version"));
 
     // Test statistics with real data
-    let stats = store.get_all_statistics(TEST_GRAPH_ID).await.unwrap();
-    assert_eq!(stats.get("node_count"), Some(&serde_json::json!(1)));
-    assert_eq!(stats.get("relationship_count"), Some(&serde_json::json!(0)));
+    let stats = store.get_all_statistics().await.unwrap();
+    // Stats is HashMap<graph_id, HashMap<stat_name, value>>
+    assert!(!stats.is_empty());
+    
+    // Get statistics for TEST_GRAPH_ID
+    let graph_stats = stats.get(TEST_GRAPH_ID).unwrap();
+    assert_eq!(graph_stats.get("node_count"), Some(&serde_json::json!(1)));
+    assert_eq!(graph_stats.get("relationship_count"), Some(&serde_json::json!(0)));
 
     // Verify label statistics
-    let labels = stats.get("labels").unwrap();
+    let labels = graph_stats.get("labels").unwrap();
     let labels_map: HashMap<String, usize> = serde_json::from_value(labels.clone()).unwrap();
     assert_eq!(labels_map.get("TestNode"), Some(&1));
+    Ok(())
 }
 
 /// Test error handling and edge cases
@@ -419,27 +428,28 @@ async fn test_error_handling_integration() -> TylResult<()> {
     // Test updating non-existent relationship
     let mut updates = HashMap::new();
     updates.insert("key".to_string(), serde_json::json!("value"));
-    let result = store.update_relationship("non_existent", updates).await;
+    let result = store.update_relationship(TEST_GRAPH_ID, "non_existent", updates).await;
     assert!(result.is_err());
 
     // Test traversal from non-existent node
     let result = store
-        .get_neighbors("non_existent", TraversalParams::default())
+        .get_neighbors(TEST_GRAPH_ID, "non_existent", TraversalParams::default())
         .await;
     assert!(result.is_err());
 
     // Test path finding with non-existent nodes
     let result = store
-        .find_shortest_path("non_existent_1", "non_existent_2", TraversalParams::default())
+        .find_shortest_path(TEST_GRAPH_ID, "non_existent_1", "non_existent_2", TraversalParams::default())
         .await;
     assert!(result.is_ok());
     assert!(result.unwrap().is_none());
 
     // Test analytics on non-existent node
     let result = store
-        .recommend_relationships("non_existent", RecommendationType::SimilarNodes, 5)
+        .recommend_relationships(TEST_GRAPH_ID, "non_existent", RecommendationType::SimilarNodes, 5)
         .await;
     assert!(result.is_err());
+    Ok(())
 }
 
 /// Test performance and scalability aspects
@@ -463,7 +473,7 @@ async fn test_performance_and_scalability() -> TylResult<()> {
         .collect();
 
     let start = std::time::Instant::now();
-    let results = store.create_nodes_batch(nodes).await.unwrap();
+    let results = store.create_nodes_batch(TEST_GRAPH_ID, nodes).await.unwrap();
     let creation_time = start.elapsed();
 
     // Should complete reasonably quickly
@@ -485,7 +495,7 @@ async fn test_performance_and_scalability() -> TylResult<()> {
     // Test traversal performance
     let start = std::time::Instant::now();
     let _neighbors = store
-        .get_neighbors(&node_ids[0], TraversalParams::default())
+        .get_neighbors(TEST_GRAPH_ID, &node_ids[0], TraversalParams::default())
         .await
         .unwrap();
     let traversal_time = start.elapsed();
@@ -496,7 +506,7 @@ async fn test_performance_and_scalability() -> TylResult<()> {
     // Test path finding performance
     let start = std::time::Instant::now();
     let _path = store
-        .find_shortest_path(&node_ids[0], &node_ids[10], TraversalParams::default())
+        .find_shortest_path(TEST_GRAPH_ID, &node_ids[0], &node_ids[10], TraversalParams::default())
         .await
         .unwrap();
     let pathfinding_time = start.elapsed();
@@ -505,8 +515,9 @@ async fn test_performance_and_scalability() -> TylResult<()> {
     assert!(pathfinding_time.as_millis() < 500);
 
     // Verify final counts
-    assert_eq!(store.node_count().await, node_count);
-    assert_eq!(store.relationship_count().await, relationship_count);
+    assert_eq!(store.node_count(TEST_GRAPH_ID).await, node_count);
+    assert_eq!(store.relationship_count(TEST_GRAPH_ID).await, relationship_count);
+    Ok(())
 }
 
 /// Test serialization and data consistency
@@ -548,7 +559,7 @@ async fn test_serialization_consistency() -> TylResult<()> {
 
     // Test relationship serialization
     let node2_id = store
-        .create_node(GraphNode::new().with_label("SimpleNode"))
+        .create_node(TEST_GRAPH_ID, GraphNode::new().with_label("SimpleNode"))
         .await
         .unwrap();
     let rel = GraphRelationship::new(&node_id, &node2_id, "COMPLEX_RELATIONSHIP").with_property(
@@ -570,6 +581,7 @@ async fn test_serialization_consistency() -> TylResult<()> {
     assert_eq!(retrieved_rel.properties, rel_deserialized.properties);
     assert_eq!(retrieved_rel.from_node_id, rel_deserialized.from_node_id);
     assert_eq!(retrieved_rel.to_node_id, rel_deserialized.to_node_id);
+    Ok(())
 }
 
 /// Test concurrent access patterns
@@ -577,7 +589,8 @@ async fn test_serialization_consistency() -> TylResult<()> {
 #[tokio::test]
 async fn test_concurrent_access() -> TylResult<()> {
     // TDD: Basic concurrent access safety
-    let store = std::sync::Arc::new(MockGraphStore::new());
+    let store_inner = setup_test_store().await?;
+    let store = std::sync::Arc::new(store_inner);
 
     // Create initial node
     let initial_node = GraphNode::with_id("shared_node")
@@ -596,7 +609,7 @@ async fn test_concurrent_access() -> TylResult<()> {
         let handle = tokio::spawn(async move {
             let mut updates = HashMap::new();
             updates.insert("counter".to_string(), serde_json::json!(i));
-            store_clone.update_node("shared_node", updates).await
+            store_clone.update_node(TEST_GRAPH_ID, "shared_node", updates).await
         });
         handles.push(handle);
     }
@@ -610,6 +623,7 @@ async fn test_concurrent_access() -> TylResult<()> {
     // Verify node still exists and is accessible
     let final_node = store.get_node(TEST_GRAPH_ID, "shared_node").await.unwrap();
     assert!(final_node.is_some());
+    Ok(())
 }
 
 /// Test integration with TYL error framework
@@ -639,4 +653,5 @@ async fn test_tyl_error_integration() -> TylResult<()> {
         Err(e) => assert!(format!("{e}").contains("Connection failed")),
         Ok(_) => panic!("Expected error"),
     }
+    Ok(())
 }
